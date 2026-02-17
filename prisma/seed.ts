@@ -13,7 +13,7 @@ type TvInfo = {
   duration?: string;
   releaseDate?: string;
   quality?: string;
-  episodeInfo?: { sub?: string; dub?: string };
+  episodeInfo?: { sub?: string; dub?: string; eps?: string };
   sub?: string;
   dub?: string;
   eps?: string;
