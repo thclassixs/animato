@@ -1,0 +1,12 @@
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "cdn.noitatnemucod.net", pathname: "/**" },
+      { protocol: "https", hostname: "placehold.co", pathname: "/**" },
+    ],
+  },
+};
+
+export default nextConfig;

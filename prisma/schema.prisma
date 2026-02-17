@@ -1,0 +1,136 @@
+// Animato - Database-first schema
+// PostgreSQL (Neon) + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Genres (Action, Adventure, etc.) - many-to-many with Anime
+model Genre {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  slug   String  @unique
+  animes AnimeGenre[]
+}
+
+// Anime - main content entity
+model Anime {
+  id            String   @id @default(cuid())
+  externalId    String   @unique // API id e.g. "jujutsu-kaisen-the-culling-game-part-1-20401"
+  dataId        String   // API data_id e.g. "20401"
+  title         String
+  japaneseTitle String?  @map("japanese_title")
+  description   String?  @db.Text
+  poster        String?  // poster image URL
+  posterSmall   String?  @map("poster_small") // 300x400 thumbnail
+  showType      String?  @map("show_type") // TV, OVA, etc.
+  duration      String?  // e.g. "24m"
+  releaseDate   String?  @map("release_date")
+  quality       String?  // HD, etc.
+  subCount      String?  @map("sub_count") // episode count sub
+  dubCount      String?  @map("dub_count") // episode count dub
+  totalEps      Int?     @map("total_eps")
+  adultContent  Boolean  @default(false) @map("adult_content")
+  slug          String   @unique // URL-friendly: externalId or derived
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  episodes   Episode[]
+  genres     AnimeGenre[]
+  favorites     Favorite[]
+  watchHistory  WatchHistory[]
+  featuredSlots FeaturedAnime[]
+
+  @@map("anime")
+}
+
+// Anime <-> Genre many-to-many
+model AnimeGenre {
+  animeId String
+  genreId String
+  anime   Anime  @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([animeId, genreId])
+  @@map("anime_genre")
+}
+
+// Episodes - one-to-many with Anime
+model Episode {
+  id          String   @id @default(cuid())
+  animeId     String   @map("anime_id")
+  number      Int      // episode number
+  title       String?
+  subStreamUrl String? @map("sub_stream_url") @db.Text // iframe embed URL for sub
+  dubStreamUrl String? @map("dub_stream_url") @db.Text // iframe embed URL for dub
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  anime         Anime          @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  watchHistory  WatchHistory[]
+
+  @@unique([animeId, number])
+  @@map("episode")
+}
+
+// User - for favorites and watch history (can be extended with auth)
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  favorites     Favorite[]
+  watchHistory  WatchHistory[]
+}
+
+// User's favorite anime
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  animeId   String   @map("anime_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@map("favorite")
+}
+
+// Watch progress per user per episode
+model WatchHistory {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  animeId    String   @map("anime_id")
+  episodeId  String   @map("episode_id")
+  progress   Int      @default(0) // seconds watched
+  completed  Boolean  @default(false)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime   Anime   @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+  @@map("watch_history")
+}
+
+// Homepage row placement (spotlights, trending, top today/week/month)
+model FeaturedAnime {
+  id     String @id @default(cuid())
+  animeId String @map("anime_id")
+  type   String  // spotlight | trending | top_today | top_week | top_month
+  order  Int     // 1-based position in row
+  anime  Anime   @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([type, order], name: "featured_type_order")
+  @@map("featured_anime")
+}
